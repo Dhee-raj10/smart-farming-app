@@ -1,0 +1,33 @@
+const express = require("express");
+const router = express.Router();
+const Crop = require("../models/Crop");
+const { protect } = require("../middleware/authMiddleware");
+
+// Recommend crops for logged-in users
+router.post("/recommend", protect, async (req, res) => {
+  const { soil, rainfall, temperature } = req.body;
+  
+  try {
+    // Use flexible matching with regex for better results
+    const crops = await Crop.find({
+      $or: [
+        { soil: new RegExp(soil, 'i') },
+        { rainfall: new RegExp(rainfall, 'i') },
+        { temperature: new RegExp(temperature, 'i') }
+      ]
+    }).limit(4);
+    
+    // If no crops found with partial matches, return all crops
+    if (crops.length === 0) {
+      const allCrops = await Crop.find().limit(4);
+      return res.json(allCrops);
+    }
+    
+    res.json(crops);
+  } catch (err) {
+    console.error("Error fetching crops:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+module.exports = router;

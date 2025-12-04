@@ -1,0 +1,155 @@
+/* Global Styles */
+.bg-farm-green {
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+}
+
+.bg-farm-gradient {
+  background: linear-gradient(135deg, #2E7D32 0%, #1976D2 100%);
+}
+
+.text-farm-green {
+  color: #2E7D32;
+}
+
+.farm-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.farm-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.weather-card {
+  background: linear-gradient(135deg, #64B5F6 0%, #1976D2 100%);
+  color: white;
+}
+
+.soil-card {
+  background: linear-gradient(135deg, #A1887F 0%, #795548 100%);
+  color: white;
+}
+
+.hero-section {
+  background: linear-gradient(135deg, #2E7D32 0%, #1976D2 100%);
+  min-height: 70vh;
+  color: white;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2E7D32;
+}
+
+.navbar-brand {
+  font-weight: bold;
+  color: #2E7D32 !important;
+}
+
+.btn-farm {
+  background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
+  border: none;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.btn-farm:hover {
+  background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.3);
+}
+
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  margin: 0 auto 1rem;
+}
+
+.dashboard-header {
+  background: linear-gradient(135deg, #2E7D32 0%, #1976D2 100%);
+  color: white;
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+}
+
+.crop-recommendation {
+  border-left: 4px solid #4CAF50;
+  background: #f8f9fa;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0 8px 8px 0;
+}
+
+.suitability-excellent {
+  border-left-color: #4CAF50;
+  background: #e8f5e8;
+}
+
+.suitability-good {
+  border-left-color: #FFC107;
+  background: #fff8e1;
+}
+
+.suitability-fair {
+  border-left-color: #FF9800;
+  background: #fff3e0;
+}
+
+.suitability-poor {
+  border-left-color: #F44336;
+  background: #ffebee;
+}
+
+.loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e9ecef;
+  border-top: 3px solid #2E7D32;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
