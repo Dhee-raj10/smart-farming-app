@@ -3,6 +3,14 @@
 Complete Flask ML API for Smart Farming Application
 Includes: Fertility, Irrigation, and Soil Image Classification
 """
+import os
+import sys
+
+# Download models on startup if they don't exist
+if not os.path.exists('models/fertility_model.pkl'):
+    print("⚠️  Models not found. Downloading from cloud storage...")
+    from download_models import download_models
+    download_models()
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
