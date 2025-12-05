@@ -1,7 +1,7 @@
 # flask_api/app.py
 """
 Complete Flask ML API for Smart Farming Application
-Includes: Fertility, Irrigation, and Soil Image Classification
+FIXED: Added root route and improved error handling
 """
 import os
 import sys
@@ -16,14 +16,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import joblib
 import numpy as np
-import os
 import json
 from werkzeug.utils import secure_filename
 
 # For image processing
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.preprocessing import image
 from PIL import Image
 import io
 
@@ -55,9 +53,16 @@ except Exception as e:
     print(f"❌ Fertility model error: {e}")
     fertility_model = None
 
-# Irrigation model
+# Irrigation model - WITH ERROR HANDLING
 try:
-    irrigation_model = joblib.load('models/irrigation_model.pkl')
+    import pickle
+    # Try loading with different protocols
+    try:
+        with open('models/irrigation_model.pkl', 'rb') as f:
+            irrigation_model = pickle.load(f)
+    except:
+        irrigation_model = joblib.load('models/irrigation_model.pkl', mmap_mode=None)
+    
     irrigation_scaler = joblib.load('models/irrigation_scaler.pkl')
     irrigation_features = joblib.load('models/irrigation_features.pkl')
     print("✅ Irrigation model loaded")
@@ -67,10 +72,12 @@ except Exception as e:
 
 # Soil Image Classification model
 try:
-    # Try .keras format first (recommended)
     if os.path.exists('models/soil_image_model.keras'):
         soil_image_model = keras.models.load_model('models/soil_image_model.keras')
         print("✅ Loaded soil model from .keras format")
+    elif os.path.exists('models/soil_image_best.keras'):
+        soil_image_model = keras.models.load_model('models/soil_image_best.keras')
+        print("✅ Loaded soil model from soil_image_best.keras")
     elif os.path.exists('models/soil_image_model.h5'):
         soil_image_model = keras.models.load_model('models/soil_image_model.h5')
         print("✅ Loaded soil model from .h5 format")
@@ -90,7 +97,7 @@ try:
 except Exception as e:
     print(f"⚠️  Soil image model not loaded: {e}")
     soil_image_model = None
-    IMG_SIZE = 224  # Default
+    IMG_SIZE = 224
 
 print("="*70)
 print("Flask ML API Ready on http://127.0.0.1:8000")
@@ -103,28 +110,10 @@ def allowed_file(filename):
 
 def get_soil_characteristics(soil_type):
     """Return characteristics and recommendations for each soil type"""
-    
-    # Clean the soil type name (remove underscores)
     clean_name = soil_type.replace('_', ' ')
     
     characteristics = {
         'Alluvial Soil': {
-            'description': 'Rich in minerals, highly fertile, found near river banks',
-            'color': '#8B7355',
-            'texture': 'Fine to coarse, well-balanced',
-            'best_crops': ['Rice', 'Wheat', 'Sugarcane', 'Cotton', 'Jute', 'Vegetables'],
-            'pH_range': '6.5-7.5',
-            'water_retention': 'Good',
-            'fertility': 'High',
-            'recommendations': [
-                'Excellent for most crops due to high fertility',
-                'Good water retention capacity',
-                'Add organic matter to maintain soil structure',
-                'Practice crop rotation for sustained productivity',
-                'Regular irrigation during dry periods'
-            ]
-        },
-        'Alluvial_Soil': {  # Handle both formats
             'description': 'Rich in minerals, highly fertile, found near river banks',
             'color': '#8B7355',
             'texture': 'Fine to coarse, well-balanced',
@@ -156,22 +145,6 @@ def get_soil_characteristics(soil_type):
                 'Suitable for rain-fed farming'
             ]
         },
-        'Black_Soil': {
-            'description': 'Cotton soil, rich in clay, excellent moisture retention',
-            'color': '#2C2416',
-            'texture': 'Very fine, clayey',
-            'best_crops': ['Cotton', 'Tobacco', 'Sugarcane', 'Wheat', 'Jowar', 'Citrus'],
-            'pH_range': '7.2-8.5',
-            'water_retention': 'Excellent',
-            'fertility': 'High',
-            'recommendations': [
-                'Perfect for cotton cultivation',
-                'High moisture retention - use drip irrigation',
-                'Add lime if pH becomes too alkaline',
-                'Deep tillage recommended for better aeration',
-                'Suitable for rain-fed farming'
-            ]
-        },
         'Red Soil': {
             'description': 'Iron-rich, porous, good for groundnuts and potatoes',
             'color': '#A0522D',
@@ -187,154 +160,10 @@ def get_soil_characteristics(soil_type):
                 'Consider drip irrigation for water efficiency',
                 'Add lime to reduce acidity if pH is below 5.5'
             ]
-        },
-        'Red_Soil': {
-            'description': 'Iron-rich, porous, good for groundnuts and potatoes',
-            'color': '#A0522D',
-            'texture': 'Sandy to clay loam',
-            'best_crops': ['Groundnut', 'Potato', 'Tobacco', 'Millets', 'Pulses', 'Vegetables'],
-            'pH_range': '5.0-7.0',
-            'water_retention': 'Low to Medium',
-            'fertility': 'Low to Medium',
-            'recommendations': [
-                'Add fertilizers to boost nitrogen levels',
-                'Increase organic matter content regularly',
-                'Mulching recommended to retain moisture',
-                'Consider drip irrigation for water efficiency',
-                'Add lime to reduce acidity if pH is below 5.5'
-            ]
-        },
-        'Arid Soil': {
-            'description': 'Desert soil, low moisture, needs irrigation',
-            'color': '#D2B48C',
-            'texture': 'Sandy, coarse',
-            'best_crops': ['Millets', 'Barley', 'Cotton', 'Maize', 'Pulses'],
-            'pH_range': '7.0-8.5',
-            'water_retention': 'Very Low',
-            'fertility': 'Low',
-            'recommendations': [
-                'Requires extensive irrigation systems',
-                'Add organic matter to improve water retention',
-                'Use drought-resistant crop varieties',
-                'Drip irrigation highly recommended',
-                'Add phosphorus and nitrogen fertilizers'
-            ]
-        },
-        'Arid_Soil': {
-            'description': 'Desert soil, low moisture, needs irrigation',
-            'color': '#D2B48C',
-            'texture': 'Sandy, coarse',
-            'best_crops': ['Millets', 'Barley', 'Cotton', 'Maize', 'Pulses'],
-            'pH_range': '7.0-8.5',
-            'water_retention': 'Very Low',
-            'fertility': 'Low',
-            'recommendations': [
-                'Requires extensive irrigation systems',
-                'Add organic matter to improve water retention',
-                'Use drought-resistant crop varieties',
-                'Drip irrigation highly recommended',
-                'Add phosphorus and nitrogen fertilizers'
-            ]
-        },
-        'Laterite Soil': {
-            'description': 'Acidic soil rich in iron and aluminum',
-            'color': '#B87333',
-            'texture': 'Clay to loamy',
-            'best_crops': ['Tea', 'Coffee', 'Rubber', 'Cashew', 'Coconut'],
-            'pH_range': '4.5-6.5',
-            'water_retention': 'Medium',
-            'fertility': 'Low',
-            'recommendations': [
-                'Add lime to reduce acidity',
-                'Regular application of organic manure needed',
-                'Good for plantation crops',
-                'Mulching essential to prevent erosion',
-                'Add phosphorus fertilizers'
-            ]
-        },
-        'Laterite_Soil': {
-            'description': 'Acidic soil rich in iron and aluminum',
-            'color': '#B87333',
-            'texture': 'Clay to loamy',
-            'best_crops': ['Tea', 'Coffee', 'Rubber', 'Cashew', 'Coconut'],
-            'pH_range': '4.5-6.5',
-            'water_retention': 'Medium',
-            'fertility': 'Low',
-            'recommendations': [
-                'Add lime to reduce acidity',
-                'Regular application of organic manure needed',
-                'Good for plantation crops',
-                'Mulching essential to prevent erosion',
-                'Add phosphorus fertilizers'
-            ]
-        },
-        'Mountain Soil': {
-            'description': 'Forest soil, rich in humus, found in hilly regions',
-            'color': '#654321',
-            'texture': 'Sandy to loamy',
-            'best_crops': ['Tea', 'Coffee', 'Spices', 'Fruits', 'Wheat'],
-            'pH_range': '5.5-7.0',
-            'water_retention': 'Good',
-            'fertility': 'Medium to High',
-            'recommendations': [
-                'Good for plantation and horticulture',
-                'Prevent soil erosion with terracing',
-                'Add lime if too acidic',
-                'Suitable for organic farming',
-                'Maintain forest cover on slopes'
-            ]
-        },
-        'Mountain_Soil': {
-            'description': 'Forest soil, rich in humus, found in hilly regions',
-            'color': '#654321',
-            'texture': 'Sandy to loamy',
-            'best_crops': ['Tea', 'Coffee', 'Spices', 'Fruits', 'Wheat'],
-            'pH_range': '5.5-7.0',
-            'water_retention': 'Good',
-            'fertility': 'Medium to High',
-            'recommendations': [
-                'Good for plantation and horticulture',
-                'Prevent soil erosion with terracing',
-                'Add lime if too acidic',
-                'Suitable for organic farming',
-                'Maintain forest cover on slopes'
-            ]
-        },
-        'Yellow Soil': {
-            'description': 'Hydrated ferric oxide rich, moderate fertility',
-            'color': '#DAA520',
-            'texture': 'Sandy to loamy',
-            'best_crops': ['Rice', 'Ragi', 'Groundnut', 'Potato'],
-            'pH_range': '5.0-6.5',
-            'water_retention': 'Medium',
-            'fertility': 'Medium',
-            'recommendations': [
-                'Add organic fertilizers regularly',
-                'Monitor pH levels and add lime if needed',
-                'Good drainage required',
-                'Suitable for rice cultivation',
-                'Add phosphorus and potassium'
-            ]
-        },
-        'Yellow_Soil': {
-            'description': 'Hydrated ferric oxide rich, moderate fertility',
-            'color': '#DAA520',
-            'texture': 'Sandy to loamy',
-            'best_crops': ['Rice', 'Ragi', 'Groundnut', 'Potato'],
-            'pH_range': '5.0-6.5',
-            'water_retention': 'Medium',
-            'fertility': 'Medium',
-            'recommendations': [
-                'Add organic fertilizers regularly',
-                'Monitor pH levels and add lime if needed',
-                'Good drainage required',
-                'Suitable for rice cultivation',
-                'Add phosphorus and potassium'
-            ]
         }
     }
     
-    # Return characteristics or default
+    # Return for both underscore and space versions
     return characteristics.get(soil_type, characteristics.get(clean_name, {
         'description': f'Soil characteristics for {clean_name}',
         'color': '#8B7355',
@@ -353,7 +182,6 @@ def get_soil_characteristics(soil_type):
 
 def get_fertility_recommendation(pred_label, confidence, nutrient_values):
     """Generate detailed fertility recommendations"""
-    
     recommendations = {
         'Low': {
             'message': '⚠️ Your soil fertility is LOW. Immediate action required!',
@@ -395,12 +223,10 @@ def get_fertility_recommendation(pred_label, confidence, nutrient_values):
             'timeline': 'Maintain current schedule'
         }
     }
-    
     return recommendations.get(pred_label, recommendations['Medium'])
 
 def get_irrigation_recommendation(irrigation_needed, confidence, moisture_avg):
     """Generate irrigation recommendations"""
-    
     if irrigation_needed:
         if moisture_avg < 20:
             return {
@@ -456,6 +282,21 @@ def get_irrigation_recommendation(irrigation_needed, confidence, moisture_avg):
 
 # ==================== API ENDPOINTS ====================
 
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint - Welcome message"""
+    return jsonify({
+        'message': 'Smart Farming ML API',
+        'status': 'running',
+        'version': '1.0',
+        'endpoints': {
+            'health': '/health',
+            'fertility': '/predict/fertility',
+            'irrigation': '/predict/irrigation',
+            'soil_image': '/predict/soil-image'
+        }
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -475,12 +316,10 @@ def health_check():
 @app.route('/predict/soil-image', methods=['POST'])
 def predict_soil_image():
     """Predict soil type from uploaded image"""
-    
     if not soil_image_model:
         return jsonify({'error': 'Soil image model not loaded'}), 503
     
     try:
-        # Check if image file is present
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
         
@@ -492,24 +331,15 @@ def predict_soil_image():
         if not allowed_file(file.filename):
             return jsonify({'error': 'Invalid file type. Use PNG, JPG, or JPEG'}), 400
         
-        print("="*70)
-        print("SOIL IMAGE PREDICTION REQUEST")
-        print(f"Filename: {file.filename}")
-        print("="*70)
-        
         # Read and preprocess image
         img_bytes = file.read()
         img = Image.open(io.BytesIO(img_bytes))
         
-        # Convert to RGB if necessary
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
-        # Resize to model input size
         img = img.resize((IMG_SIZE, IMG_SIZE))
-        
-        # Convert to array and normalize
-        img_array = image.img_to_array(img)
+        img_array = keras.preprocessing.image.img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0
         
@@ -518,7 +348,6 @@ def predict_soil_image():
         predicted_class_idx = np.argmax(predictions[0])
         confidence = float(predictions[0][predicted_class_idx])
         
-        # Get predicted soil type
         predicted_soil_type = soil_class_labels[str(predicted_class_idx)]
         
         # Get top 3 predictions
@@ -531,10 +360,7 @@ def predict_soil_image():
                 'confidence_percentage': f"{predictions[0][idx]*100:.1f}%"
             })
         
-        # Get soil characteristics
         characteristics = get_soil_characteristics(predicted_soil_type)
-        
-        print(f"Prediction: {predicted_soil_type}, Confidence: {confidence:.2%}")
         
         return jsonify({
             'success': True,
@@ -554,17 +380,14 @@ def predict_soil_image():
 @app.route('/predict/fertility', methods=['POST'])
 def predict_fertility():
     """Predict soil fertility from nutrient values"""
-    
     if not fertility_model:
         return jsonify({'error': 'Fertility model not loaded'}), 503
     
     try:
         data = request.json
-        
         if not data:
             return jsonify({'error': 'No data received'}), 400
         
-        # Extract features
         features = []
         missing_features = []
         
@@ -575,14 +398,10 @@ def predict_fertility():
                 try:
                     features.append(float(data[feature_name]))
                 except (ValueError, TypeError):
-                    return jsonify({
-                        'error': f'Invalid value for {feature_name}'
-                    }), 400
+                    return jsonify({'error': f'Invalid value for {feature_name}'}), 400
         
         if missing_features:
-            return jsonify({
-                'error': f'Missing features: {missing_features}'
-            }), 400
+            return jsonify({'error': f'Missing features: {missing_features}'}), 400
         
         X = np.array([features])
         X_scaled = fertility_scaler.transform(X)
@@ -641,13 +460,11 @@ def predict_fertility():
 @app.route('/predict/irrigation', methods=['POST'])
 def predict_irrigation():
     """Predict irrigation need"""
-    
     if not irrigation_model:
         return jsonify({'error': 'Irrigation model not loaded'}), 503
     
     try:
         data = request.json
-        
         if not data:
             return jsonify({'error': 'No data received'}), 400
         
@@ -674,10 +491,7 @@ def predict_irrigation():
             'confidence': confidence,
             'confidence_percentage': f"{confidence*100:.1f}%",
             'average_moisture': avg_moisture,
-            'sensor_readings': {
-                f'sensor{i+1}': float(val) 
-                for i, val in enumerate(features)
-            },
+            'sensor_readings': {f'sensor{i+1}': float(val) for i, val in enumerate(features)},
             'recommendation': recommendation
         })
         
@@ -689,4 +503,5 @@ def predict_irrigation():
 
 # ==================== RUN SERVER ====================
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)
