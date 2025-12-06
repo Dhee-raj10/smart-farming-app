@@ -9,7 +9,13 @@ const cropRoutes = require("./routes/cropRoutes");
 const app = express();
 connectDB();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://smart-farming-frontend.onrender.com",  // Your frontend
+    "http://localhost:3000"                          // Local dev
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

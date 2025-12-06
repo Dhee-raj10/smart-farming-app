@@ -26,7 +26,12 @@ from PIL import Image
 import io
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://smart-farming-frontend.onrender.com",  # Your frontend
+    "https://smart-farming-backend.onrender.com",    # Your backend
+    "http://localhost:3000",                          # Local dev
+    "http://localhost:5000"                           # Local backend
+])
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
