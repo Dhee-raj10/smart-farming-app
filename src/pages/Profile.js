@@ -8,8 +8,9 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem("token"); // Assuming you store JWT in localStorage
+      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
       try {
-        const { data } = await axios.get("http://localhost:5000/api/auth/profile", {
+        const { data } = await axios.get(`${BACKEND_URL}/api/auth/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

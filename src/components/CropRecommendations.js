@@ -6,10 +6,11 @@ const CropRecommendations = ({ soil, rainfall, temperature }) => {
   const [loading, setLoading] = useState(true);
 
   // Fetch recommendations from backend
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const response = await axios.post("http://localhost:5000/api/crops/recommend", {
+        const response = await axios.post(`${BACKEND_URL}/api/crops/recommend`, {
           soil,
           rainfall,
           temperature

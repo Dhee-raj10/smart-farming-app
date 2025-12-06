@@ -4,6 +4,7 @@ import axios from 'axios';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 const SoilMoistureForm = () => {
   const [formData, setFormData] = useState({
     moisture0: '', moisture1: '', moisture2: '', moisture3: '', moisture4: ''
@@ -24,7 +25,7 @@ const SoilMoistureForm = () => {
     setResult(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/crops/moisture', formData);
+      const response = await axios.post(`${BACKEND_URL}/api/crops/moisture`, formData);
       setResult(response.data);
     } catch (err) {
       console.error("Error:", err);

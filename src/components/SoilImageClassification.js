@@ -4,6 +4,7 @@ import axios from 'axios';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 const SoilImageClassification = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -38,15 +39,16 @@ const SoilImageClassification = () => {
       formData.append('image', selectedFile);
 
       const response = await axios.post(
-        'http://localhost:5000/api/crops/soil-image',
+        `${BACKEND_URL}/api/crops/soil-image`,
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          timeout: 30000, // 30 seconds
+          timeout: 30000,
         }
       );
+
 
       console.log('Response:', response.data);
       setResult(response.data);

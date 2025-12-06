@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/auth"; // Backend URL
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/auth";
 
 export const authUtils = {
   login: async (email, password) => {

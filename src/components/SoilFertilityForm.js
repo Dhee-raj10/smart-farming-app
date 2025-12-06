@@ -18,24 +18,25 @@ const SoilFertilityForm = () => {
   };
 
   const handleSubmit = async e => {
-    e.preventDefault();
-    setLoading(true);
-    setResult(null);
+  e.preventDefault();
+  setLoading(true);
+  setResult(null);
 
-    console.log("Sending data:", formData);
+  console.log("Sending data:", formData);
 
-    try {
-      const response = await axios.post('http://localhost:5000/api/crops/fertility', formData);
-      console.log("Response:", response.data);
-      setResult(response.data);
-    } catch (err) {
-      console.error("Full error:", err);
-      console.error("Error response:", err.response?.data);
-      setResult({ error: err.response?.data?.error || 'Prediction failed. Please try again.' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+    const response = await axios.post(`${BACKEND_URL}/api/crops/fertility`, formData);
+    console.log("Response:", response.data);
+    setResult(response.data);
+  } catch (err) {
+    console.error("Full error:", err);
+    console.error("Error response:", err.response?.data);
+    setResult({ error: err.response?.data?.error || 'Prediction failed. Please try again.' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getNutrientBadgeColor = (level) => {
     switch(level) {
