@@ -9,115 +9,106 @@ const cropRoutes = require("./routes/cropRoutes");
 const app = express();
 connectDB();
 
+// ====================================================================
+//                    🔧 FIXED CORS CONFIGURATION
+// ====================================================================
+const allowedOrigins = [
+  "https://smart-farming-app-2.onrender.com",  // Your deployed frontend
+  "http://localhost:3000",                      // Local development
+  "http://localhost:5173"                       // Vite local dev (if used)
+];
+
 app.use(cors({
-  origin: [
-    "https://smart-farming-frontend.onrender.com",  // Your frontend
-    "http://localhost:3000"                          // Local dev
-  ],
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/crops", cropRoutes);
 
-// ------------------- FLASK API BASE URL -------------------
-const FLASK_API_URL = process.env.FLASK_API_URL || "https://smart-farming-app-fml1.onrender.com/";
-
+// ====================================================================
+//                 🌐 FLASK API CONFIGURATION
+// ====================================================================
+const FLASK_API_URL = process.env.FLASK_API_URL || "http://localhost:8000";
+console.log('🔗 Flask API URL:', FLASK_API_URL);
 
 // ====================================================================
-//                 🌱 FERTILITY PREDICTION (ML MODEL)
+//                 🌱 FERTILITY PREDICTION
 // ====================================================================
 app.post("/api/crops/fertility", async (req, res) => {
   try {
+    console.log('📤 Forwarding fertility request to Flask...');
     const response = await axios.post(
       `${FLASK_API_URL}/predict/fertility`,
-      req.body
+      req.body,
+      { timeout: 30000 }
     );
+    console.log('✅ Flask fertility response received');
     res.json(response.data);
   } catch (error) {
-    console.error("Error calling Flask fertility API:", error.message);
-    res.status(500).json({ error: "Failed to get fertility prediction" });
+    console.error("❌ Fertility API error:", error.message);
+    res.status(500).json({ 
+      error: "Failed to get fertility prediction",
+      details: error.response?.data || error.message 
+    });
   }
 });
 
-
 // ====================================================================
-//          💧 IRRIGATION (MOISTURE) PREDICTION — NEW IMPROVED
+//          💧 IRRIGATION PREDICTION
 // ====================================================================
 app.post("/api/crops/moisture", async (req, res) => {
   try {
-    console.log("Backend received irrigation request:", req.body);
-
+    console.log('📤 Forwarding irrigation request to Flask...');
     const response = await axios.post(
-      `${FLASK_API_URL}/predict/irrigation`,   // <-- NEW ENDPOINT
+      `${FLASK_API_URL}/predict/irrigation`,
       req.body,
-      {
+      { 
         headers: { "Content-Type": "application/json" },
-        timeout: 10000, // 10 seconds
+        timeout: 30000
       }
     );
-
-    console.log("Flask returned:", response.data);
+    console.log('✅ Flask irrigation response received');
     res.json(response.data);
-
   } catch (error) {
-    console.error("Error calling Flask irrigation API:", error.message);
-
-    if (error.response) {
-      // Flask returned an error response
-      console.error("Flask error:", error.response.data);
-      return res.status(error.response.status).json(error.response.data);
-    }
-
+    console.error("❌ Irrigation API error:", error.message);
+    
     if (error.code === "ECONNREFUSED") {
       return res.status(503).json({
-        error: "Cannot connect to ML service. Make sure Flask is running on port 8000",
+        error: "Cannot connect to ML service",
+        details: "Flask API is not responding"
       });
     }
 
     res.status(500).json({
       error: "Failed to get irrigation prediction",
-      details: error.message,
+      details: error.response?.data || error.message
     });
   }
 });
 
-
 // ====================================================================
-//                             ❤️ HEALTH CHECK
-// ====================================================================
-app.get("/api/health", async (req, res) => {
-  try {
-    const flaskResponse = await axios.get(`${FLASK_API_URL}/health`, {
-      timeout: 3000,
-    });
-
-    res.json({
-      backend: "healthy",
-      flask: flaskResponse.data,
-    });
-
-  } catch (error) {
-    res.json({
-      backend: "healthy",
-      flask: "unavailable",
-      error: error.message,
-    });
-  }
-});
-
-// Add this to smart-farming-app/backend/server.js
-
-// ====================================================================
-//                 📸 SOIL IMAGE CLASSIFICATION (ML MODEL)
+//                 📸 SOIL IMAGE CLASSIFICATION
 // ====================================================================
 const multer = require('multer');
 const FormData = require('form-data');
 const fs = require('fs');
 
-// Configure multer for image uploads
 const upload = multer({ dest: 'uploads/' });
 
 app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
@@ -126,24 +117,20 @@ app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    console.log("Backend received soil image:", req.file);
+    console.log("📤 Forwarding soil image to Flask...");
 
-    // Create form data to send to Flask
     const formData = new FormData();
     formData.append('image', fs.createReadStream(req.file.path), {
       filename: req.file.originalname,
       contentType: req.file.mimetype
     });
 
-    // Send to Flask API
     const response = await axios.post(
       `${FLASK_API_URL}/predict/soil-image`,
       formData,
       {
-        headers: {
-          ...formData.getHeaders()
-        },
-        timeout: 30000, // 30 seconds for image processing
+        headers: formData.getHeaders(),
+        timeout: 60000, // 60 seconds for image processing
       }
     );
 
@@ -152,27 +139,26 @@ app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
       if (err) console.error("Error deleting temp file:", err);
     });
 
-    console.log("Flask returned:", response.data);
+    console.log("✅ Flask soil-image response received");
     res.json(response.data);
 
   } catch (error) {
-    console.error("Error calling Flask soil-image API:", error.message);
+    console.error("❌ Soil-image API error:", error.message);
 
     // Clean up uploaded file on error
-    if (req.file && req.file.path) {
+    if (req.file?.path) {
       fs.unlink(req.file.path, (err) => {
         if (err) console.error("Error deleting temp file:", err);
       });
     }
 
     if (error.response) {
-      console.error("Flask error:", error.response.data);
       return res.status(error.response.status).json(error.response.data);
     }
 
     if (error.code === "ECONNREFUSED") {
       return res.status(503).json({
-        error: "Cannot connect to ML service. Make sure Flask is running on port 8000",
+        error: "Cannot connect to ML service",
       });
     }
 
@@ -184,9 +170,53 @@ app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
 });
 
 // ====================================================================
+//                             ❤️ HEALTH CHECK
+// ====================================================================
+app.get("/api/health", async (req, res) => {
+  try {
+    const flaskResponse = await axios.get(`${FLASK_API_URL}/health`, {
+      timeout: 5000,
+    });
+
+    res.json({
+      backend: "healthy",
+      flask: flaskResponse.data,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    res.json({
+      backend: "healthy",
+      flask: "unavailable",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ====================================================================
+//                      🚀 ROOT ENDPOINT
+// ====================================================================
+app.get("/", (req, res) => {
+  res.json({
+    message: "Smart Farming Backend API",
+    status: "running",
+    endpoints: {
+      auth: "/api/auth/*",
+      crops: "/api/crops/*",
+      health: "/api/health"
+    }
+  });
+});
+
+// ====================================================================
 //                           🚀 SERVER START
 // ====================================================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log("="*50);
+  console.log(`🚀 Backend running on port ${PORT}`);
+  console.log(`🔗 Flask API: ${FLASK_API_URL}`);
+  console.log(`🌐 CORS allowed origins:`, allowedOrigins);
+  console.log("="*50);
+});
