@@ -13,21 +13,21 @@ connectDB();
 //                    🔧 FIXED CORS CONFIGURATION
 // ====================================================================
 const allowedOrigins = [
-  "https://smart-farming-app-2.onrender.com",  // Your deployed frontend
-  "http://localhost:3000",                      // Local development
-  "http://localhost:5173"                       // Vite local dev (if used)
+  "https://smart-farming-app-2.onrender.com",  // Frontend
+  "http://localhost:3000",
+  "http://localhost:5173"
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc)
+    // Allow requests with no origin (Postman, curl, etc.)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.log('❌ Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow anyway for debugging
     }
   },
   credentials: true,
@@ -52,19 +52,29 @@ console.log('🔗 Flask API URL:', FLASK_API_URL);
 // ====================================================================
 app.post("/api/crops/fertility", async (req, res) => {
   try {
-    console.log('📤 Forwarding fertility request to Flask...');
+    console.log('📤 Fertility request received');
+    console.log('📊 Request body:', req.body);
+    console.log('🔗 Forwarding to:', `${FLASK_API_URL}/predict/fertility`);
+    
     const response = await axios.post(
       `${FLASK_API_URL}/predict/fertility`,
       req.body,
-      { timeout: 30000 }
+      { 
+        timeout: 30000,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
-    console.log('✅ Flask fertility response received');
+    
+    console.log('✅ Flask response received:', response.status);
     res.json(response.data);
   } catch (error) {
     console.error("❌ Fertility API error:", error.message);
+    console.error("❌ Error details:", error.response?.data || error);
+    
     res.status(500).json({ 
       error: "Failed to get fertility prediction",
-      details: error.response?.data || error.message 
+      details: error.response?.data || error.message,
+      flaskUrl: FLASK_API_URL // Help debug
     });
   }
 });

@@ -27,13 +27,14 @@ CORS(app,
      origins=[
          "https://smart-farming-app-2.onrender.com",  # Frontend
          "https://smart-farming-app-1.onrender.com",  # Backend
-         "http://localhost:3000",                      # Local frontend
-         "http://localhost:5000",                      # Local backend
-         "http://localhost:5173"                       # Vite local
+         "http://localhost:3000",
+         "http://localhost:5000",
+         "http://localhost:5173"
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
-     supports_credentials=True
+     supports_credentials=True,
+     expose_headers=['Content-Type']
 )
 
 # Configuration
