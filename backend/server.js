@@ -136,11 +136,11 @@ app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
     });
 
     const response = await axios.post(
-      `${FLASK_API_URL}/predict/soil-image`,
+      `${FLASK_API_URL}/predict/soil-image`,  // ← Make sure this is correct
       formData,
       {
         headers: formData.getHeaders(),
-        timeout: 60000, // 60 seconds for image processing
+        timeout: 60000,
       }
     );
 
