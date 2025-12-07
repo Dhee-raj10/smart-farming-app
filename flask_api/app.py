@@ -79,6 +79,7 @@ except Exception as e:
     irrigation_model = None
 
 # Soil Image model - FIXED LOADING
+# Soil Image model - FIXED LOADING
 soil_image_model = None
 soil_class_labels = None
 soil_metadata = None
@@ -88,24 +89,29 @@ try:
     print("🔄 Loading soil image model...")
     
     # Try different model formats in order of preference
-    # Better model loading with fallback
     model_paths = [
         'models/soil_image_model.keras',
         'models/soil_image_best.keras',
         'models/soil_image_model.h5',
         'models/soil_image_best.h5'
     ]
-
+    
+    model_loaded = False  # ✅ DEFINE IT HERE FIRST!
     for model_path in model_paths:
         if os.path.exists(model_path):
             try:
+                print(f"  Trying to load: {model_path}")
                 soil_image_model = keras.models.load_model(model_path, compile=False)
+                print(f"  ✅ Loaded: {model_path}")
+                model_loaded = True
                 break
-            except:
+            except Exception as e:
+                print(f"  ❌ Failed to load {model_path}: {e}")
                 continue
-            
+    
     if not model_loaded:
         raise FileNotFoundError("No soil image model found in any format")
+    
     
     # Load class labels
     if os.path.exists('models/soil_class_labels.json'):
