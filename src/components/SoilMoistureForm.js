@@ -4,7 +4,7 @@ import axios from 'axios';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-farming-app-1.onrender.com';
 const SoilMoistureForm = () => {
   const [formData, setFormData] = useState({
     moisture0: '', moisture1: '', moisture2: '', moisture3: '', moisture4: ''

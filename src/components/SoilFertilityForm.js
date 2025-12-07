@@ -25,7 +25,7 @@ const SoilFertilityForm = () => {
   console.log("Sending data:", formData);
 
   try {
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-farming-app-1.onrender.com';
     const response = await axios.post(`${BACKEND_URL}/api/crops/fertility`, formData);
     console.log("Response:", response.data);
     setResult(response.data);
