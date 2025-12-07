@@ -78,32 +78,68 @@ except Exception as e:
     print(f"⚠️  Irrigation model error: {e}")
     irrigation_model = None
 
-# Soil Image model
+# Soil Image model - FIXED LOADING
+soil_image_model = None
+soil_class_labels = None
+soil_metadata = None
+IMG_SIZE = 224
+
 try:
-    if os.path.exists('models/soil_image_model.keras'):
-        soil_image_model = keras.models.load_model('models/soil_image_model.keras')
-    elif os.path.exists('models/soil_image_best.keras'):
-        soil_image_model = keras.models.load_model('models/soil_image_best.keras')
-    elif os.path.exists('models/soil_image_model.h5'):
-        soil_image_model = keras.models.load_model('models/soil_image_model.h5')
+    print("🔄 Loading soil image model...")
+    
+    # Try different model formats in order of preference
+    # Better model loading with fallback
+    model_paths = [
+        'models/soil_image_model.keras',
+        'models/soil_image_best.keras',
+        'models/soil_image_model.h5',
+        'models/soil_image_best.h5'
+    ]
+
+    for model_path in model_paths:
+        if os.path.exists(model_path):
+            try:
+                soil_image_model = keras.models.load_model(model_path, compile=False)
+                break
+            except:
+                continue
+            
+    if not model_loaded:
+        raise FileNotFoundError("No soil image model found in any format")
+    
+    # Load class labels
+    if os.path.exists('models/soil_class_labels.json'):
+        with open('models/soil_class_labels.json', 'r') as f:
+            soil_class_labels = json.load(f)
+        print(f"  ✅ Loaded class labels: {list(soil_class_labels.values())}")
     else:
-        raise FileNotFoundError("No soil model found")
+        # Fallback class labels
+        soil_class_labels = {
+            "0": "Alluvial Soil",
+            "1": "Black Soil",
+            "2": "Red Soil"
+        }
+        print("  ⚠️  Using default class labels")
     
-    with open('models/soil_class_labels.json', 'r') as f:
-        soil_class_labels = json.load(f)
+    # Load metadata
+    if os.path.exists('models/soil_model_metadata.json'):
+        with open('models/soil_model_metadata.json', 'r') as f:
+            soil_metadata = json.load(f)
+        IMG_SIZE = soil_metadata.get('img_size', 224)
+        print(f"  ✅ Loaded metadata (IMG_SIZE: {IMG_SIZE})")
+    else:
+        print("  ⚠️  Using default metadata")
     
-    with open('models/soil_model_metadata.json', 'r') as f:
-        soil_metadata = json.load(f)
+    print("✅ Soil image model loaded successfully")
     
-    IMG_SIZE = soil_metadata['img_size']
-    print("✅ Soil image model loaded")
 except Exception as e:
-    print(f"⚠️  Soil image model error: {e}")
-    soil_image_model = None
-    IMG_SIZE = 224
+    print(f"❌ Soil image model error: {e}")
+    import traceback
+    traceback.print_exc()
 
 print("="*70)
 print("Flask ML API Ready!")
+print(f"Models loaded: Fertility={fertility_model is not None}, Irrigation={irrigation_model is not None}, SoilImage={soil_image_model is not None}")
 print("="*70)
 
 # ==================== HELPER FUNCTIONS ====================
@@ -112,7 +148,7 @@ def allowed_file(filename):
 
 def get_soil_characteristics(soil_type):
     """Return characteristics for soil type"""
-    clean_name = soil_type.replace('_', ' ')
+    clean_name = soil_type.replace('_', ' ').strip()
     
     characteristics = {
         'Alluvial Soil': {
@@ -243,6 +279,8 @@ def predict_fertility():
         
     except Exception as e:
         print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/predict/irrigation', methods=['POST'])
@@ -285,57 +323,109 @@ def predict_irrigation():
         
     except Exception as e:
         print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/predict/soil-image', methods=['POST'])
+@app.route('/predict/soil-image', methods=['POST', 'OPTIONS'])
 def predict_soil_image():
     """Predict soil type from image"""
+    
+    # Handle OPTIONS request for CORS
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    print("\n" + "="*70)
+    print("SOIL IMAGE PREDICTION REQUEST")
+    print("="*70)
+    
     if not soil_image_model:
+        print("❌ Model not loaded")
         return jsonify({'error': 'Soil image model not loaded'}), 503
     
     try:
+        print("📸 Checking for image file...")
+        
         if 'image' not in request.files:
+            print("❌ No image in request")
             return jsonify({'error': 'No image provided'}), 400
         
         file = request.files['image']
         
         if file.filename == '':
+            print("❌ Empty filename")
             return jsonify({'error': 'No file selected'}), 400
         
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type'}), 400
+            print(f"❌ Invalid file type: {file.filename}")
+            return jsonify({'error': 'Invalid file type. Use JPG, JPEG, or PNG'}), 400
+        
+        print(f"✅ File received: {file.filename}")
         
         # Process image
+        print("🔄 Processing image...")
         img_bytes = file.read()
+        print(f"  Image size: {len(img_bytes)} bytes")
+        
         img = Image.open(io.BytesIO(img_bytes))
+        print(f"  Original size: {img.size}, Mode: {img.mode}")
         
         if img.mode != 'RGB':
             img = img.convert('RGB')
+            print(f"  Converted to RGB")
         
         img = img.resize((IMG_SIZE, IMG_SIZE))
+        print(f"  Resized to: {IMG_SIZE}x{IMG_SIZE}")
+        
         img_array = keras.preprocessing.image.img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0
+        print(f"  Array shape: {img_array.shape}")
         
         # Predict
+        print("🔄 Running prediction...")
         predictions = soil_image_model.predict(img_array, verbose=0)
+        print(f"  Predictions shape: {predictions.shape}")
+        print(f"  Raw predictions: {predictions[0]}")
+        
         predicted_idx = np.argmax(predictions[0])
         confidence = float(predictions[0][predicted_idx])
         
         predicted_soil = soil_class_labels[str(predicted_idx)]
+        print(f"  Predicted: {predicted_soil} (confidence: {confidence*100:.1f}%)")
+        
+        # Get top 3 predictions
+        top_3_idx = np.argsort(predictions[0])[-3:][::-1]
+        top_predictions = []
+        for idx in top_3_idx:
+            top_predictions.append({
+                'soil_type': soil_class_labels[str(idx)],
+                'confidence': float(predictions[0][idx]),
+                'confidence_percentage': f"{predictions[0][idx]*100:.1f}%"
+            })
+        
         characteristics = get_soil_characteristics(predicted_soil)
         
-        return jsonify({
+        result = {
             'success': True,
             'prediction': predicted_soil,
             'confidence': confidence,
             'confidence_percentage': f"{confidence*100:.1f}%",
+            'top_predictions': top_predictions,
             'characteristics': characteristics
-        })
+        }
+        
+        print("✅ Prediction successful")
+        print("="*70 + "\n")
+        
+        return jsonify(result)
         
     except Exception as e:
-        print(f"ERROR: {e}")
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        print("="*70 + "\n")
+        return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
 
 # ==================== RUN SERVER ====================
 if __name__ == '__main__':
