@@ -49,26 +49,31 @@ console.log('🔗 Flask API URL:', FLASK_API_URL);
 // ====================================================================
 //              🔥 KEEP FLASK API WARM (Render Free Tier Fix)
 // ====================================================================
-// Ping Flask every 5 minutes to prevent spin-down
+// Ping Flask every 10 minutes to prevent spin-down (less aggressive)
 setInterval(async () => {
   try {
     await axios.get(`${FLASK_API_URL}/health`, { timeout: 10000 });
     console.log('✅ Flask keep-alive ping successful');
   } catch (err) {
-    console.log('⚠️  Flask keep-alive ping failed:', err.message);
+    // Silently fail - don't spam logs
+    if (err.response?.status !== 429) {
+      console.log('⚠️  Flask keep-alive ping failed:', err.message);
+    }
   }
-}, 5 * 60 * 1000); // 5 minutes
+}, 10 * 60 * 1000); // 10 minutes (less aggressive)
 
-// Initial ping on startup
+// Initial ping on startup (delayed to let Flask start)
 setTimeout(async () => {
   try {
     console.log('🔄 Initial Flask health check...');
     const response = await axios.get(`${FLASK_API_URL}/health`, { timeout: 30000 });
     console.log('✅ Flask is ready:', response.data);
   } catch (err) {
-    console.log('⚠️  Flask not ready yet:', err.message);
+    if (err.response?.status !== 429) {
+      console.log('⚠️  Flask not ready yet:', err.message);
+    }
   }
-}, 5000);
+}, 30000); // Wait 30 seconds before first ping
 
 // ====================================================================
 //                 🌱 FERTILITY PREDICTION
