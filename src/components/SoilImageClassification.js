@@ -1,30 +1,109 @@
 // frontend/src/components/SoilImageClassification.js
+// ✅ FIXED: Better error handling, image compression, and detailed logging
+
 import React, { useState } from 'react';
 import axios from 'axios';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://smart-farming-app-1.onrender.com';
+
 const SoilImageClassification = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      
-      // Create preview URL
+  // ✅ COMPRESS IMAGE BEFORE UPLOAD
+  const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
       reader.readAsDataURL(file);
       
-      // Clear previous results
-      setResult(null);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Calculate new dimensions
+          if (width > height) {
+            if (width > maxWidth) {
+              height *= maxWidth / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width *= maxHeight / height;
+              height = maxHeight;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob(
+            (blob) => {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              console.log(`✅ Image compressed: ${(file.size / 1024).toFixed(2)}KB → ${(compressedFile.size / 1024).toFixed(2)}KB`);
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        
+        img.onerror = reject;
+      };
+      
+      reader.onerror = reject;
+    });
+  };
+
+  const handleFileSelect = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      console.log(`📷 Original file: ${file.name}, Size: ${(file.size / 1024).toFixed(2)}KB`);
+      
+      // Check file size
+      if (file.size > 16 * 1024 * 1024) {
+        alert('File is too large! Please select an image under 16MB.');
+        return;
+      }
+      
+      try {
+        // Compress image if it's large
+        let processedFile = file;
+        if (file.size > 500 * 1024) { // If > 500KB, compress
+          console.log('🗜️ Compressing image...');
+          processedFile = await compressImage(file, 800, 800, 0.8);
+        }
+        
+        setSelectedFile(processedFile);
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result);
+        };
+        reader.readAsDataURL(processedFile);
+        
+        setResult(null);
+        setUploadProgress(0);
+      } catch (err) {
+        console.error('❌ Error processing image:', err);
+        alert('Failed to process image. Please try another image.');
+      }
     }
   };
 
@@ -33,10 +112,18 @@ const SoilImageClassification = () => {
 
     setLoading(true);
     setResult(null);
+    setUploadProgress(0);
+
+    console.log('\n=== SOIL IMAGE UPLOAD ===');
+    console.log('Backend URL:', BACKEND_URL);
+    console.log('File:', selectedFile.name, `(${(selectedFile.size / 1024).toFixed(2)}KB)`);
+    console.log('File type:', selectedFile.type);
 
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
+
+      console.log('📤 Uploading to:', `${BACKEND_URL}/api/crops/soil-image`);
 
       const response = await axios.post(
         `${BACKEND_URL}/api/crops/soil-image`,
@@ -45,20 +132,55 @@ const SoilImageClassification = () => {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          timeout: 30000,
+          timeout: 120000, // 2 minutes
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+            console.log(`⏳ Upload progress: ${percentCompleted}%`);
+          },
         }
       );
 
-
-      console.log('Response:', response.data);
+      console.log('✅ Response received:', response.status);
+      console.log('Response data:', response.data);
+      
       setResult(response.data);
+      
     } catch (err) {
-      console.error('Error:', err);
-      setResult({ 
-        error: err.response?.data?.error || 'Failed to analyze image. Please try again.' 
-      });
+      console.error('\n❌ ERROR DETAILS:');
+      console.error('Error type:', err.name);
+      console.error('Error message:', err.message);
+      
+      if (err.code === 'ECONNABORTED') {
+        console.error('⏱️ Request timed out');
+        setResult({ 
+          error: 'Request timed out. The server might be processing a large image or starting up. Please try again with a smaller image or wait 30 seconds and retry.' 
+        });
+      } else if (err.response) {
+        console.error('Response status:', err.response.status);
+        console.error('Response data:', err.response.data);
+        
+        setResult({ 
+          error: err.response.data?.error || err.response.data?.details || 'Server error. Please try again.',
+          details: JSON.stringify(err.response.data, null, 2)
+        });
+      } else if (err.request) {
+        console.error('No response received');
+        console.error('Request:', err.request);
+        
+        setResult({ 
+          error: 'Cannot connect to server. Please check if the backend is running.',
+          suggestion: 'The server might be starting up. Wait 30 seconds and try again.'
+        });
+      } else {
+        console.error('Unknown error:', err);
+        setResult({ 
+          error: err.message || 'Unknown error occurred' 
+        });
+      }
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -66,6 +188,7 @@ const SoilImageClassification = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setResult(null);
+    setUploadProgress(0);
   };
 
   return (
@@ -109,7 +232,7 @@ const SoilImageClassification = () => {
                               onChange={handleFileSelect}
                             />
                             <small className="text-muted">
-                              Supported formats: JPG, JPEG, PNG (Max 16MB)
+                              Supported: JPG, PNG (Max 16MB). Images over 500KB will be automatically compressed.
                             </small>
                           </div>
 
@@ -121,6 +244,29 @@ const SoilImageClassification = () => {
                                 className="img-fluid rounded shadow"
                                 style={{ maxHeight: '300px', width: '100%', objectFit: 'cover' }}
                               />
+                              {selectedFile && (
+                                <div className="text-center mt-2">
+                                  <small className="text-muted">
+                                    Size: {(selectedFile.size / 1024).toFixed(2)}KB
+                                  </small>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Progress Bar */}
+                          {loading && uploadProgress > 0 && (
+                            <div className="mb-4">
+                              <div className="d-flex justify-content-between mb-2">
+                                <small>Uploading...</small>
+                                <small>{uploadProgress}%</small>
+                              </div>
+                              <div className="progress" style={{ height: '10px' }}>
+                                <div 
+                                  className="progress-bar progress-bar-striped progress-bar-animated"
+                                  style={{ width: `${uploadProgress}%`, backgroundColor: '#8B4513' }}
+                                ></div>
+                              </div>
                             </div>
                           )}
 
@@ -138,7 +284,9 @@ const SoilImageClassification = () => {
                               {loading ? (
                                 <>
                                   <span className="spinner-border spinner-border-sm me-2"></span>
-                                  Analyzing Image...
+                                  {uploadProgress > 0 && uploadProgress < 100 
+                                    ? `Uploading ${uploadProgress}%...`
+                                    : 'Analyzing Image...'}
                                 </>
                               ) : (
                                 <>
@@ -152,6 +300,7 @@ const SoilImageClassification = () => {
                               <button
                                 className="btn btn-outline-secondary btn-lg rounded-pill"
                                 onClick={handleReset}
+                                disabled={loading}
                               >
                                 <i className="bi bi-arrow-clockwise me-2"></i>
                                 Upload New Image
@@ -180,7 +329,7 @@ const SoilImageClassification = () => {
                               </li>
                               <li className="mb-2">
                                 <i className="bi bi-check-circle text-success me-2"></i>
-                                Fill the frame with soil
+                                Smaller images (under 1MB) upload faster
                               </li>
                             </ul>
                           </div>
@@ -206,12 +355,39 @@ const SoilImageClassification = () => {
                             </div>
                           ) : result.error ? (
                             <div className="alert alert-danger">
-                              <i className="bi bi-exclamation-triangle me-2"></i>
-                              <strong>Error:</strong> {result.error}
+                              <h6 className="alert-heading">
+                                <i className="bi bi-exclamation-triangle me-2"></i>
+                                Error Occurred
+                              </h6>
+                              <p className="mb-2"><strong>Message:</strong> {result.error}</p>
+                              
+                              {result.suggestion && (
+                                <p className="mb-2"><strong>Suggestion:</strong> {result.suggestion}</p>
+                              )}
+                              
+                              {result.details && (
+                                <details className="mt-3">
+                                  <summary className="btn btn-sm btn-outline-secondary">
+                                    Show Technical Details
+                                  </summary>
+                                  <pre className="mt-2 p-2 bg-light rounded small" style={{ maxHeight: '200px', overflow: 'auto' }}>
+                                    {result.details}
+                                  </pre>
+                                </details>
+                              )}
+                              
+                              <hr />
+                              <h6 className="mb-2">Troubleshooting:</h6>
+                              <ul className="small mb-0">
+                                <li>Try uploading a smaller image (under 1MB)</li>
+                                <li>Wait 30 seconds and try again (server may be starting)</li>
+                                <li>Check if image is a valid JPG/PNG file</li>
+                                <li>Try a different browser</li>
+                              </ul>
                             </div>
                           ) : (
                             <div>
-                              {/* Main Prediction */}
+                              {/* Success - Main Prediction */}
                               <div 
                                 className="p-4 rounded-3 text-center mb-4"
                                 style={{ 
@@ -345,9 +521,9 @@ const SoilImageClassification = () => {
                     About Soil Classification
                   </h6>
                   <p className="mb-0 small">
-                    Our AI model has been trained on comprehensive soil image datasets to identify different 
-                    soil types based on color, texture, and composition. This helps you make informed decisions 
-                    about crop selection and soil management practices.
+                    Our AI model analyzes soil images to identify type, texture, and composition. 
+                    For best results, use clear photos taken in natural daylight. Images are automatically 
+                    compressed for faster upload while maintaining quality.
                   </p>
                 </div>
               </div>

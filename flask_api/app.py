@@ -23,18 +23,17 @@ app = Flask(__name__)
 # ====================================================================
 #                    🔧 FIXED CORS CONFIGURATION
 # ====================================================================
+# ✅ ALLOW ALL ORIGINS FOR LOCAL DEVELOPMENT
 CORS(app, 
-     origins=[
-         "https://smart-farming-app-2.onrender.com",  # Frontend
-         "https://smart-farming-app-1.onrender.com",  # Backend
-         "http://localhost:3000",
-         "http://localhost:5000",
-         "http://localhost:5173"
-     ],
-     methods=['GET', 'POST', 'OPTIONS'],
-     allow_headers=['Content-Type', 'Authorization'],
-     supports_credentials=True,
-     expose_headers=['Content-Type']
+     resources={
+         r"/*": {
+             "origins": "*",  # Allow all origins locally
+             "methods": ["GET", "POST", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "supports_credentials": False,
+             "expose_headers": ["Content-Type"]
+         }
+     }
 )
 
 # Configuration
@@ -78,8 +77,7 @@ except Exception as e:
     print(f"⚠️  Irrigation model error: {e}")
     irrigation_model = None
 
-# Soil Image model - FIXED LOADING
-# Soil Image model - FIXED LOADING
+# Soil Image model
 soil_image_model = None
 soil_class_labels = None
 soil_metadata = None
@@ -88,7 +86,6 @@ IMG_SIZE = 224
 try:
     print("🔄 Loading soil image model...")
     
-    # Try different model formats in order of preference
     model_paths = [
         'models/soil_image_model.keras',
         'models/soil_image_best.keras',
@@ -96,7 +93,7 @@ try:
         'models/soil_image_best.h5'
     ]
     
-    model_loaded = False  # ✅ DEFINE IT HERE FIRST!
+    model_loaded = False
     for model_path in model_paths:
         if os.path.exists(model_path):
             try:
@@ -112,14 +109,12 @@ try:
     if not model_loaded:
         raise FileNotFoundError("No soil image model found in any format")
     
-    
     # Load class labels
     if os.path.exists('models/soil_class_labels.json'):
         with open('models/soil_class_labels.json', 'r') as f:
             soil_class_labels = json.load(f)
         print(f"  ✅ Loaded class labels: {list(soil_class_labels.values())}")
     else:
-        # Fallback class labels
         soil_class_labels = {
             "0": "Alluvial Soil",
             "1": "Black Soil",
@@ -245,9 +240,14 @@ def health_check():
         }
     })
 
-@app.route('/predict/fertility', methods=['POST'])
+@app.route('/predict/fertility', methods=['POST', 'OPTIONS'])
 def predict_fertility():
     """Predict soil fertility"""
+    
+    # Handle OPTIONS for CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     if not fertility_model:
         return jsonify({'error': 'Fertility model not loaded'}), 503
     
@@ -289,9 +289,14 @@ def predict_fertility():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/predict/irrigation', methods=['POST'])
+@app.route('/predict/irrigation', methods=['POST', 'OPTIONS'])
 def predict_irrigation():
     """Predict irrigation need"""
+    
+    # Handle OPTIONS for CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     if not irrigation_model:
         return jsonify({'error': 'Irrigation model not loaded'}), 503
     
@@ -436,4 +441,8 @@ def predict_soil_image():
 # ==================== RUN SERVER ====================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print("\n" + "="*70)
+    print(f"🚀 Starting Flask on http://localhost:{port}")
+    print("🌐 CORS enabled for ALL origins (local development)")
+    print("="*70 + "\n")
+    app.run(host='0.0.0.0', port=port, debug=True)
