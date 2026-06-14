@@ -155,6 +155,16 @@ try:
     
     print("✅ Soil image model loaded successfully")
     
+    # Warmup prediction
+    try:
+        dummy = np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32)
+        soil_image_model.predict(dummy, verbose=0)
+        print("✅ Warmup prediction complete")
+    except Exception as w:
+        print(f"⚠️  Warmup failed (non-critical): {w}")
+
+    print("✅ Soil image model loaded successfully")
+    
 except Exception as e:
     print(f"❌ Soil image model error: {e}")
     import traceback

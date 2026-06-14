@@ -184,7 +184,7 @@ app.post("/api/crops/soil-image", upload.single('image'), async (req, res) => {
       formData,
       {
         headers: formData.getHeaders(),
-        timeout: 180000, // 3 MINUTES for image processing + cold start
+        timeout: 300000, // 3 MINUTES for image processing + cold start
         maxContentLength: Infinity,
         maxBodyLength: Infinity
       }
