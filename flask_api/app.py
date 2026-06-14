@@ -62,16 +62,41 @@ except Exception as e:
     fertility_model = None
 
 # Irrigation model
+# Irrigation model - loaded from irrigation_assets/ (committed directly to repo)
 try:
     import pickle
-    with open('irrigation_assets/irrigation_model.pkl', 'rb') as f:
-        irrigation_model = pickle.load(f)
 
-    irrigation_scaler = joblib.load('irrigation_assets/irrigation_scaler.pkl')
-    irrigation_features = joblib.load('irrigation_assets/irrigation_features.pkl')
-    print("✅ Irrigation model loaded")
+    # Try irrigation_assets/ first (committed to repo, always reliable)
+    irrigation_paths = [
+        ('irrigation_assets/irrigation_model.pkl',
+         'irrigation_assets/irrigation_scaler.pkl',
+         'irrigation_assets/irrigation_features.pkl'),
+        ('models/irrigation_model.pkl',
+         'models/irrigation_scaler.pkl',
+         'models/irrigation_features.pkl'),
+    ]
+
+    irrigation_model = None
+    for model_path, scaler_path, features_path in irrigation_paths:
+        try:
+            with open(model_path, 'rb') as f:
+                irrigation_model = pickle.load(f)
+            irrigation_scaler = joblib.load(scaler_path)
+            irrigation_features = joblib.load(features_path)
+            print(f"✅ Irrigation model loaded from {model_path}")
+            break
+        except Exception as inner_e:
+            print(f"  ⚠️  Failed from {model_path}: {inner_e}")
+            irrigation_model = None
+            continue
+
+    if irrigation_model is None:
+        raise Exception("All irrigation model paths failed")
+
 except Exception as e:
     print(f"⚠️  Irrigation model error: {e}")
+    import traceback
+    traceback.print_exc()
     irrigation_model = None
 
 # Soil Image model
@@ -384,7 +409,6 @@ def predict_soil_image():
         
         img = img.resize((IMG_SIZE, IMG_SIZE))
         print(f"  Resized to: {IMG_SIZE}x{IMG_SIZE}")
-        
         img_array = np.array(img, dtype=np.float32)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0
