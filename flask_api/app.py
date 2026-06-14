@@ -64,14 +64,11 @@ except Exception as e:
 # Irrigation model
 try:
     import pickle
-    try:
-        with open('models/irrigation_model.pkl', 'rb') as f:
-            irrigation_model = pickle.load(f)
-    except:
-        irrigation_model = joblib.load('models/irrigation_model.pkl', mmap_mode=None)
-    
-    irrigation_scaler = joblib.load('models/irrigation_scaler.pkl')
-    irrigation_features = joblib.load('models/irrigation_features.pkl')
+    with open('irrigation_assets/irrigation_model.pkl', 'rb') as f:
+        irrigation_model = pickle.load(f)
+
+    irrigation_scaler = joblib.load('irrigation_assets/irrigation_scaler.pkl')
+    irrigation_features = joblib.load('irrigation_assets/irrigation_features.pkl')
     print("✅ Irrigation model loaded")
 except Exception as e:
     print(f"⚠️  Irrigation model error: {e}")
@@ -388,7 +385,7 @@ def predict_soil_image():
         img = img.resize((IMG_SIZE, IMG_SIZE))
         print(f"  Resized to: {IMG_SIZE}x{IMG_SIZE}")
         
-        img_array = keras.preprocessing.image.img_to_array(img)
+        img_array = np.array(img, dtype=np.float32)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0
         print(f"  Array shape: {img_array.shape}")
